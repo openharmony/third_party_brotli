@@ -1,13 +1,11 @@
 Name:           brotli
-Version:        1.0.5
-Release:        3
+Version:        1.0.7
+Release:        1
 Summary:        Lossless compression algorithm
 
 License:        MIT
 URL:            https://github.com/google/brotli
 Source0:        https://github.com/google/brotli/archive/v%{version}.tar.gz
-
-Patch6000:      Fix-auto-detect-of-bundled-mode-704.patch
 
 BuildRequires:  python2-devel python3-devel gcc-c++ gcc cmake
 
@@ -108,6 +106,12 @@ popd
 %{_mandir}/man3/*
 
 %changelog
+* Thu Apr 16 2020 chengquan<chengquan3@huawei.com> -1.0.7-1
+- Type:enhancement
+- ID:NA
+- SUG:NA
+- DESC:upgrade software to v1.0.7
+
 * Thu Dec 19 2019 openEuler Buildteam <buildteam@openeuler.org> - 1.0.5-3
 - fix auto detect of bundled mode
 
