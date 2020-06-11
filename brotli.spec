@@ -81,9 +81,6 @@ pushd build
 ctest -V
 popd
 
-%{__python2} setup.py test
-%{__python3} setup.py test
-
 %files
 %license LICENSE
 %{_bindir}/brotli
