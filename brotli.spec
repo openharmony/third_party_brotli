@@ -1,6 +1,6 @@
 Name:           brotli
 Version:        1.0.7
-Release:        2
+Release:        3
 Summary:        Lossless compression algorithm
 
 License:        MIT
@@ -18,6 +18,7 @@ Patch6005: Add-an-option-to-avoid-building-shared-libraries.patch
 Patch6006: Disable-PIC-in-EMCC-mode.patch
 Patch6007: Add-missing-const-to-a-couple-of-kConstants.patch
 Patch6008: Move-TZCNT-and-BSR-intrinsics-and-add-MSVC-versions.patch
+Patch6009: CVE-2020-8927.patch
 
 %description
 Brotli is a generic-purpose lossless compression algorithm that compresses
@@ -113,6 +114,12 @@ popd
 %{_mandir}/man3/*
 
 %changelog
+* Mon Oct 19 2020 wangjie<wangjie294@huawei.com> -1.0.7-3
+- Type:CVE
+- CVE:CVE-2020-8927
+- SUG:NA
+- DESC:fix CVE-2020-8927
+
 * Mon Oct 19 2020 wangjie<wangjie294@huawei.com> -1.0.7-2
 - Type:bugfix
 - ID:NA
