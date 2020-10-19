@@ -1,0 +1,623 @@
+From 78e7bbc3c34bb85ecc9a912929e8b3b224973b05 Mon Sep 17 00:00:00 2001
+From: Eugene Kliuchnikov <eustas@google.com>
+Date: Fri, 3 May 2019 11:51:11 +0200
+Subject: [PATCH] Update (#753)
+
+ * fix executable mode of decode.js
+ * explain clang-analyser about non-nullability
+ * fix "dead assignment"
+ * rename proguard.cfg -> proguard.pgcfg
+---
+ c/dec/decode.c                         |  3 ++-
+ c/enc/backward_references_hq.c         | 12 +++++++-----
+ c/enc/block_splitter.c                 |  6 +++---
+ c/enc/block_splitter_inc.h             | 21 ++++++++++++++------
+ c/enc/brotli_bit_stream.c              |  8 ++++----
+ c/enc/cluster_inc.h                    |  9 ++++++---
+ c/enc/encode.c                         | 31 ++++++++++++++++++-----------
+ c/enc/hash.h                           |  2 +-
+ c/enc/hash_longest_match_quickly_inc.h | 14 ++++++-------
+ c/enc/hash_rolling_inc.h               |  2 +-
+ c/enc/memory.h                         | 36 ++++++++++++++++++++++------------
+ c/enc/metablock.c                      | 22 ++++++++++-----------
+ c/enc/metablock_inc.h                  |  2 +-
+ c/enc/ringbuffer.h                     |  2 +-
+ java/org/brotli/dec/BUILD              |  2 +-
+ java/org/brotli/dec/proguard.cfg       |  6 ------
+ java/org/brotli/dec/proguard.pgcfg     |  6 ++++++
+ js/decode.js                           |  0
+ 18 files changed, 110 insertions(+), 74 deletions(-)
+ delete mode 100644 java/org/brotli/dec/proguard.cfg
+ create mode 100644 java/org/brotli/dec/proguard.pgcfg
+ mode change 100755 => 100644 js/decode.js
+
+diff --git a/c/dec/decode.c b/c/dec/decode.c
+index bde4795..9c10f50 100644
+--- a/c/dec/decode.c
++++ b/c/dec/decode.c
+@@ -41,7 +41,8 @@ extern "C" {
+ 
+ /* We need the slack region for the following reasons:
+     - doing up to two 16-byte copies for fast backward copying
+-    - inserting transformed dictionary word (5 prefix + 24 base + 8 suffix) */
++    - inserting transformed dictionary word:
++        5 prefix + 24 base + 8 suffix */
+ static const uint32_t kRingBufferWriteAheadSlack = 42;
+ 
+ static const uint8_t kCodeLengthCodeOrder[BROTLI_CODE_LENGTH_CODES] = {
+diff --git a/c/enc/backward_references_hq.c b/c/enc/backward_references_hq.c
+index cd6bb70..c42744b 100644
+--- a/c/enc/backward_references_hq.c
++++ b/c/enc/backward_references_hq.c
+@@ -724,9 +724,8 @@ void BrotliCreateZopfliBackwardReferences(MemoryManager* m, size_t num_bytes,
+     ContextLut literal_context_lut, const BrotliEncoderParams* params,
+     Hasher* hasher, int* dist_cache, size_t* last_insert_len,
+     Command* commands, size_t* num_commands, size_t* num_literals) {
+-  ZopfliNode* nodes;
+-  nodes = BROTLI_ALLOC(m, ZopfliNode, num_bytes + 1);
+-  if (BROTLI_IS_OOM(m)) return;
++  ZopfliNode* nodes = BROTLI_ALLOC(m, ZopfliNode, num_bytes + 1);
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(nodes)) return;
+   BrotliInitZopfliNodes(nodes, num_bytes + 1);
+   *num_commands += BrotliZopfliComputeShortestPath(m, num_bytes,
+       position, ringbuffer, ringbuffer_mask, literal_context_lut, params,
+@@ -760,7 +759,10 @@ void BrotliCreateHqZopfliBackwardReferences(MemoryManager* m, size_t num_bytes,
+   BROTLI_UNUSED(literal_context_lut);
+   size_t gap = 0;
+   size_t shadow_matches = 0;
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(num_matches) ||
++      BROTLI_IS_NULL(matches)) {
++    return;
++  }
+   for (i = 0; i + HashTypeLengthH10() - 1 < num_bytes; ++i) {
+     const size_t pos = position + i;
+     size_t max_distance = BROTLI_MIN(size_t, pos, max_backward_limit);
+@@ -807,7 +809,7 @@ void BrotliCreateHqZopfliBackwardReferences(MemoryManager* m, size_t num_bytes,
+   memcpy(orig_dist_cache, dist_cache, 4 * sizeof(dist_cache[0]));
+   orig_num_commands = *num_commands;
+   nodes = BROTLI_ALLOC(m, ZopfliNode, num_bytes + 1);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(nodes)) return;
+   InitZopfliCostModel(m, &model, &params->dist, num_bytes);
+   if (BROTLI_IS_OOM(m)) return;
+   for (i = 0; i < 2; i++) {
+diff --git a/c/enc/block_splitter.c b/c/enc/block_splitter.c
+index d308eca..deb7c2e 100644
+--- a/c/enc/block_splitter.c
++++ b/c/enc/block_splitter.c
+@@ -132,7 +132,7 @@ void BrotliSplitBlock(MemoryManager* m,
+   {
+     size_t literals_count = CountLiterals(cmds, num_commands);
+     uint8_t* literals = BROTLI_ALLOC(m, uint8_t, literals_count);
+-    if (BROTLI_IS_OOM(m)) return;
++    if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(literals)) return;
+     /* Create a continuous array of literals. */
+     CopyLiteralsToByteArray(cmds, num_commands, data, pos, mask, literals);
+     /* Create the block split on the array of literals.
+@@ -150,7 +150,7 @@ void BrotliSplitBlock(MemoryManager* m,
+     /* Compute prefix codes for commands. */
+     uint16_t* insert_and_copy_codes = BROTLI_ALLOC(m, uint16_t, num_commands);
+     size_t i;
+-    if (BROTLI_IS_OOM(m)) return;
++    if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(insert_and_copy_codes)) return;
+     for (i = 0; i < num_commands; ++i) {
+       insert_and_copy_codes[i] = cmds[i].cmd_prefix_;
+     }
+@@ -170,7 +170,7 @@ void BrotliSplitBlock(MemoryManager* m,
+     uint16_t* distance_prefixes = BROTLI_ALLOC(m, uint16_t, num_commands);
+     size_t j = 0;
+     size_t i;
+-    if (BROTLI_IS_OOM(m)) return;
++    if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(distance_prefixes)) return;
+     for (i = 0; i < num_commands; ++i) {
+       const Command* cmd = &cmds[i];
+       if (CommandCopyLen(cmd) && cmd->cmd_prefix_ >= 128) {
+diff --git a/c/enc/block_splitter_inc.h b/c/enc/block_splitter_inc.h
+index 023712b..e612d6a 100644
+--- a/c/enc/block_splitter_inc.h
++++ b/c/enc/block_splitter_inc.h
+@@ -219,7 +219,12 @@ static void FN(ClusterBlocks)(MemoryManager* m,
+   uint32_t symbols[HISTOGRAMS_PER_BATCH] = { 0 };
+   uint32_t remap[HISTOGRAMS_PER_BATCH] = { 0 };
+ 
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(histogram_symbols) ||
++      BROTLI_IS_NULL(block_lengths) || BROTLI_IS_NULL(all_histograms) ||
++      BROTLI_IS_NULL(cluster_size) || BROTLI_IS_NULL(histograms) ||
++      BROTLI_IS_NULL(pairs)) {
++    return;
++  }
+ 
+   memset(block_lengths, 0, num_blocks * sizeof(uint32_t));
+ 
+@@ -278,11 +283,11 @@ static void FN(ClusterBlocks)(MemoryManager* m,
+   if (pairs_capacity < max_num_pairs + 1) {
+     BROTLI_FREE(m, pairs);
+     pairs = BROTLI_ALLOC(m, HistogramPair, max_num_pairs + 1);
+-    if (BROTLI_IS_OOM(m)) return;
++    if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(pairs)) return;
+   }
+ 
+   clusters = BROTLI_ALLOC(m, uint32_t, num_clusters);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(clusters)) return;
+   for (i = 0; i < num_clusters; ++i) {
+     clusters[i] = (uint32_t)i;
+   }
+@@ -294,7 +299,7 @@ static void FN(ClusterBlocks)(MemoryManager* m,
+   BROTLI_FREE(m, cluster_size);
+ 
+   new_index = BROTLI_ALLOC(m, uint32_t, num_clusters);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(new_index)) return;
+   for (i = 0; i < num_clusters; ++i) new_index[i] = kInvalidIndex;
+   pos = 0;
+   {
+@@ -386,7 +391,7 @@ static void FN(SplitByteVector)(MemoryManager* m,
+     return;
+   }
+   histograms = BROTLI_ALLOC(m, HistogramType, num_histograms);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(histograms)) return;
+   /* Find good entropy codes. */
+   FN(InitialEntropyCodes)(data, length,
+                           sampling_stride_length,
+@@ -405,7 +410,11 @@ static void FN(SplitByteVector)(MemoryManager* m,
+     uint16_t* new_id = BROTLI_ALLOC(m, uint16_t, num_histograms);
+     const size_t iters = params->quality < HQ_ZOPFLIFICATION_QUALITY ? 3 : 10;
+     size_t i;
+-    if (BROTLI_IS_OOM(m)) return;
++    if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(block_ids) ||
++        BROTLI_IS_NULL(insert_cost) || BROTLI_IS_NULL(cost) ||
++        BROTLI_IS_NULL(switch_signal) || BROTLI_IS_NULL(new_id)) {
++      return;
++    }
+     for (i = 0; i < iters; ++i) {
+       num_blocks = FN(FindBlocks)(data, length,
+                                   block_switch_cost,
+diff --git a/c/enc/brotli_bit_stream.c b/c/enc/brotli_bit_stream.c
+index 84b36ae..6391454 100644
+--- a/c/enc/brotli_bit_stream.c
++++ b/c/enc/brotli_bit_stream.c
+@@ -450,7 +450,7 @@ void BrotliBuildAndStoreHuffmanTreeFast(MemoryManager* m,
+     const size_t max_tree_size = 2 * length + 1;
+     HuffmanTree* tree = BROTLI_ALLOC(m, HuffmanTree, max_tree_size);
+     uint32_t count_limit;
+-    if (BROTLI_IS_OOM(m)) return;
++    if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(tree)) return;
+     for (count_limit = 1; ; count_limit *= 2) {
+       HuffmanTree* node = tree;
+       size_t l;
+@@ -714,7 +714,7 @@ static void EncodeContextMap(MemoryManager* m,
+   }
+ 
+   rle_symbols = BROTLI_ALLOC(m, uint32_t, context_map_size);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(rle_symbols)) return;
+   MoveToFrontTransform(context_map, context_map_size, rle_symbols);
+   RunLengthCodeZeros(context_map_size, rle_symbols,
+                      &num_rle_symbols, &max_run_length_prefix);
+@@ -970,7 +970,7 @@ void BrotliStoreMetaBlock(MemoryManager* m,
+   StoreCompressedMetaBlockHeader(is_last, length, storage_ix, storage);
+ 
+   tree = BROTLI_ALLOC(m, HuffmanTree, MAX_HUFFMAN_TREE_SIZE);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(tree)) return;
+   InitBlockEncoder(&literal_enc, BROTLI_NUM_LITERAL_SYMBOLS,
+       mb->literal_split.num_types, mb->literal_split.types,
+       mb->literal_split.lengths, mb->literal_split.num_blocks);
+@@ -1175,7 +1175,7 @@ void BrotliStoreMetaBlockTrivial(MemoryManager* m,
+   BrotliWriteBits(13, 0, storage_ix, storage);
+ 
+   tree = BROTLI_ALLOC(m, HuffmanTree, MAX_HUFFMAN_TREE_SIZE);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(tree)) return;
+   BuildAndStoreHuffmanTree(lit_histo.data_, BROTLI_NUM_LITERAL_SYMBOLS,
+                            BROTLI_NUM_LITERAL_SYMBOLS, tree,
+                            lit_depth, lit_bits,
+diff --git a/c/enc/cluster_inc.h b/c/enc/cluster_inc.h
+index 22ecb3c..3d4f40e 100644
+--- a/c/enc/cluster_inc.h
++++ b/c/enc/cluster_inc.h
+@@ -215,7 +215,7 @@ BROTLI_INTERNAL size_t FN(BrotliHistogramReindex)(MemoryManager* m,
+   uint32_t next_index;
+   HistogramType* tmp;
+   size_t i;
+-  if (BROTLI_IS_OOM(m)) return 0;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(new_index)) return 0;
+   for (i = 0; i < length; ++i) {
+       new_index[i] = kInvalidIndex;
+   }
+@@ -229,7 +229,7 @@ BROTLI_INTERNAL size_t FN(BrotliHistogramReindex)(MemoryManager* m,
+   /* TODO: by using idea of "cycle-sort" we can avoid allocation of
+      tmp and reduce the number of copying by the factor of 2. */
+   tmp = BROTLI_ALLOC(m, HistogramType, next_index);
+-  if (BROTLI_IS_OOM(m)) return 0;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(tmp)) return 0;
+   next_index = 0;
+   for (i = 0; i < length; ++i) {
+     if (new_index[symbols[i]] == next_index) {
+@@ -259,7 +259,10 @@ BROTLI_INTERNAL void FN(BrotliClusterHistograms)(
+   HistogramPair* pairs = BROTLI_ALLOC(m, HistogramPair, pairs_capacity + 1);
+   size_t i;
+ 
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(cluster_size) ||
++      BROTLI_IS_NULL(clusters) || BROTLI_IS_NULL(pairs)) {
++    return;
++  }
+ 
+   for (i = 0; i < in_size; ++i) {
+     cluster_size[i] = 1;
+diff --git a/c/enc/encode.c b/c/enc/encode.c
+index 3319b39..68548ef 100644
+--- a/c/enc/encode.c
++++ b/c/enc/encode.c
+@@ -212,7 +212,7 @@ static uint8_t* GetBrotliStorage(BrotliEncoderState* s, size_t size) {
+   if (s->storage_size_ < size) {
+     BROTLI_FREE(m, s->storage_);
+     s->storage_ = BROTLI_ALLOC(m, uint8_t, size);
+-    if (BROTLI_IS_OOM(m)) return NULL;
++    if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(s->storage_)) return NULL;
+     s->storage_size_ = size;
+   }
+   return s->storage_;
+@@ -251,7 +251,7 @@ static int* GetHashTable(BrotliEncoderState* s, int quality,
+       s->large_table_size_ = htsize;
+       BROTLI_FREE(m, s->large_table_);
+       s->large_table_ = BROTLI_ALLOC(m, int, htsize);
+-      if (BROTLI_IS_OOM(m)) return 0;
++      if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(s->large_table_)) return 0;
+     }
+     table = s->large_table_;
+   }
+@@ -985,7 +985,10 @@ static BROTLI_BOOL EncodeData(
+         BROTLI_ALLOC(m, uint32_t, kCompressFragmentTwoPassBlockSize);
+     s->literal_buf_ =
+         BROTLI_ALLOC(m, uint8_t, kCompressFragmentTwoPassBlockSize);
+-    if (BROTLI_IS_OOM(m)) return BROTLI_FALSE;
++    if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(s->command_buf_) ||
++        BROTLI_IS_NULL(s->literal_buf_)) {
++      return BROTLI_FALSE;
++    }
+   }
+ 
+   if (s->params.quality == FAST_ONE_PASS_COMPRESSION_QUALITY ||
+@@ -1043,7 +1046,7 @@ static BROTLI_BOOL EncodeData(
+       newsize += (bytes / 4) + 16;
+       s->cmd_alloc_size_ = newsize;
+       new_commands = BROTLI_ALLOC(m, Command, newsize);
+-      if (BROTLI_IS_OOM(m)) return BROTLI_FALSE;
++      if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(new_commands)) return BROTLI_FALSE;
+       if (s->commands_) {
+         memcpy(new_commands, s->commands_, sizeof(Command) * s->num_commands_);
+         BROTLI_FREE(m, s->commands_);
+@@ -1275,7 +1278,7 @@ static BROTLI_BOOL BrotliCompressBufferQuality10(
+       ZopfliNode* nodes = BROTLI_ALLOC(m, ZopfliNode, block_size + 1);
+       size_t path_size;
+       size_t new_cmd_alloc_size;
+-      if (BROTLI_IS_OOM(m)) goto oom;
++      if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(nodes)) goto oom;
+       BrotliInitZopfliNodes(nodes, block_size + 1);
+       StitchToPreviousBlockH10(&hasher.privat._H10, block_size, block_start,
+                                input_buffer, mask);
+@@ -1295,7 +1298,7 @@ static BROTLI_BOOL BrotliCompressBufferQuality10(
+                                       num_commands + path_size + 1);
+       if (cmd_alloc_size != new_cmd_alloc_size) {
+         Command* new_commands = BROTLI_ALLOC(m, Command, new_cmd_alloc_size);
+-        if (BROTLI_IS_OOM(m)) goto oom;
++        if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(new_commands)) goto oom;
+         cmd_alloc_size = new_cmd_alloc_size;
+         if (commands) {
+           memcpy(new_commands, commands, sizeof(Command) * num_commands);
+@@ -1327,7 +1330,7 @@ static BROTLI_BOOL BrotliCompressBufferQuality10(
+     if (metablock_size == 0) {
+       /* Write the ISLAST and ISEMPTY bits. */
+       storage = BROTLI_ALLOC(m, uint8_t, 16);
+-      if (BROTLI_IS_OOM(m)) goto oom;
++      if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(storage)) goto oom;
+       storage[0] = (uint8_t)last_bytes;
+       storage[1] = (uint8_t)(last_bytes >> 8);
+       BrotliWriteBits(2, 3, &storage_ix, storage);
+@@ -1338,7 +1341,7 @@ static BROTLI_BOOL BrotliCompressBufferQuality10(
+          CreateBackwardReferences is now unused. */
+       memcpy(dist_cache, saved_dist_cache, 4 * sizeof(dist_cache[0]));
+       storage = BROTLI_ALLOC(m, uint8_t, metablock_size + 16);
+-      if (BROTLI_IS_OOM(m)) goto oom;
++      if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(storage)) goto oom;
+       storage[0] = (uint8_t)last_bytes;
+       storage[1] = (uint8_t)(last_bytes >> 8);
+       BrotliStoreUncompressedMetaBlock(is_last, input_buffer,
+@@ -1362,7 +1365,7 @@ static BROTLI_BOOL BrotliCompressBufferQuality10(
+         BrotliOptimizeHistograms(block_params.dist.alphabet_size_limit, &mb);
+       }
+       storage = BROTLI_ALLOC(m, uint8_t, 2 * metablock_size + 503);
+-      if (BROTLI_IS_OOM(m)) goto oom;
++      if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(storage)) goto oom;
+       storage[0] = (uint8_t)last_bytes;
+       storage[1] = (uint8_t)(last_bytes >> 8);
+       BrotliStoreMetaBlock(m, input_buffer, metablock_start, metablock_size,
+@@ -1613,7 +1616,10 @@ static BROTLI_BOOL BrotliEncoderCompressStreamFast(
+           BROTLI_ALLOC(m, uint32_t, kCompressFragmentTwoPassBlockSize);
+       s->literal_buf_ =
+           BROTLI_ALLOC(m, uint8_t, kCompressFragmentTwoPassBlockSize);
+-      if (BROTLI_IS_OOM(m)) return BROTLI_FALSE;
++      if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(s->command_buf_) ||
++          BROTLI_IS_NULL(s->literal_buf_)) {
++        return BROTLI_FALSE;
++      }
+     }
+     if (s->command_buf_) {
+       command_buf = s->command_buf_;
+@@ -1621,7 +1627,10 @@ static BROTLI_BOOL BrotliEncoderCompressStreamFast(
+     } else {
+       tmp_command_buf = BROTLI_ALLOC(m, uint32_t, buf_size);
+       tmp_literal_buf = BROTLI_ALLOC(m, uint8_t, buf_size);
+-      if (BROTLI_IS_OOM(m)) return BROTLI_FALSE;
++      if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(tmp_command_buf) ||
++          BROTLI_IS_NULL(tmp_literal_buf)) {
++        return BROTLI_FALSE;
++      }
+       command_buf = tmp_command_buf;
+       literal_buf = tmp_literal_buf;
+     }
+diff --git a/c/enc/hash.h b/c/enc/hash.h
+index 60fb5df..6362f69 100644
+--- a/c/enc/hash.h
++++ b/c/enc/hash.h
+@@ -426,7 +426,7 @@ static BROTLI_INLINE void HasherSetup(MemoryManager* m, Hasher* hasher,
+     ChooseHasher(params, &params->hasher);
+     alloc_size = HasherSize(params, one_shot, input_size);
+     hasher->common.extra = BROTLI_ALLOC(m, uint8_t, alloc_size);
+-    if (BROTLI_IS_OOM(m)) return;
++    if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(hasher->common.extra)) return;
+     hasher->common.params = params->hasher;
+     switch (hasher->common.params.type) {
+ #define INITIALIZE_(N)                        \
+diff --git a/c/enc/hash_longest_match_quickly_inc.h b/c/enc/hash_longest_match_quickly_inc.h
+index 2af13c8..e5ba840 100644
+--- a/c/enc/hash_longest_match_quickly_inc.h
++++ b/c/enc/hash_longest_match_quickly_inc.h
+@@ -167,21 +167,21 @@ static BROTLI_INLINE void FN(FindLongestMatch)(
+   if (prev_ix < cur_ix) {
+     prev_ix &= (uint32_t)ring_buffer_mask;
+     if (compare_char == data[prev_ix + best_len]) {
+-      size_t len = FindMatchLengthWithLimit(&data[prev_ix],
+-                                            &data[cur_ix_masked],
+-                                            max_length);
++      const size_t len = FindMatchLengthWithLimit(
++          &data[prev_ix], &data[cur_ix_masked], max_length);
+       if (len >= 4) {
+         const score_t score = BackwardReferenceScoreUsingLastDistance(len);
+         if (best_score < score) {
+-          best_score = score;
+-          best_len = len;
+           out->len = len;
+           out->distance = cached_backward;
+-          out->score = best_score;
+-          compare_char = data[cur_ix_masked + best_len];
++          out->score = score;
+           if (BUCKET_SWEEP == 1) {
+             buckets[key] = (uint32_t)cur_ix;
+             return;
++          } else {
++            best_len = len;
++            best_score = score;
++            compare_char = data[cur_ix_masked + len];
+           }
+         }
+       }
+diff --git a/c/enc/hash_rolling_inc.h b/c/enc/hash_rolling_inc.h
+index bca41cc..586ae73 100644
+--- a/c/enc/hash_rolling_inc.h
++++ b/c/enc/hash_rolling_inc.h
+@@ -156,7 +156,7 @@ static BROTLI_INLINE void FN(FindLongestMatch)(
+     const size_t dictionary_distance, const size_t max_distance,
+     HasherSearchResult* BROTLI_RESTRICT out) {
+   const size_t cur_ix_masked = cur_ix & ring_buffer_mask;
+-  size_t pos = self->next_ix;
++  size_t pos;
+ 
+   if ((cur_ix & (JUMP - 1)) != 0) return;
+ 
+diff --git a/c/enc/memory.h b/c/enc/memory.h
+index ab928d0..832e7b2 100644
+--- a/c/enc/memory.h
++++ b/c/enc/memory.h
+@@ -56,6 +56,18 @@ BROTLI_INTERNAL void BrotliFree(MemoryManager* m, void* p);
+ #define BROTLI_IS_OOM(M) (!!(M)->is_oom)
+ #endif  /* BROTLI_ENCODER_EXIT_ON_OOM */
+ 
++/*
++BROTLI_IS_NULL is a fake check, BROTLI_IS_OOM does the heavy lifting.
++The only purpose of it is to explain static analyzers the state of things.
++NB: use ONLY together with BROTLI_IS_OOM
++    AND ONLY for allocations in the current scope.
++ */
++#if defined(__clang_analyzer__) && !defined(BROTLI_ENCODER_EXIT_ON_OOM)
++#define BROTLI_IS_NULL(A) ((A) == nullptr)
++#else  /* defined(__clang_analyzer__) */
++#define BROTLI_IS_NULL(A) (!!0)
++#endif  /* defined(__clang_analyzer__) */
++
+ BROTLI_INTERNAL void BrotliWipeOutMemoryManager(MemoryManager* m);
+ 
+ /*
+@@ -66,18 +78,18 @@ A: array
+ C: capacity
+ R: requested size
+ */
+-#define BROTLI_ENSURE_CAPACITY(M, T, A, C, R) {  \
+-  if (C < (R)) {                                 \
+-    size_t _new_size = (C == 0) ? (R) : C;       \
+-    T* new_array;                                \
+-    while (_new_size < (R)) _new_size *= 2;      \
+-    new_array = BROTLI_ALLOC((M), T, _new_size); \
+-    if (!BROTLI_IS_OOM(M) && C != 0)             \
+-      memcpy(new_array, A, C * sizeof(T));       \
+-    BROTLI_FREE((M), A);                         \
+-    A = new_array;                               \
+-    C = _new_size;                               \
+-  }                                              \
++#define BROTLI_ENSURE_CAPACITY(M, T, A, C, R) {                    \
++  if (C < (R)) {                                                   \
++    size_t _new_size = (C == 0) ? (R) : C;                         \
++    T* new_array;                                                  \
++    while (_new_size < (R)) _new_size *= 2;                        \
++    new_array = BROTLI_ALLOC((M), T, _new_size);                   \
++    if (!BROTLI_IS_OOM(M) && !BROTLI_IS_NULL(new_array) && C != 0) \
++      memcpy(new_array, A, C * sizeof(T));                         \
++    BROTLI_FREE((M), A);                                           \
++    A = new_array;                                                 \
++    C = _new_size;                                                 \
++  }                                                                \
+ }
+ 
+ /*
+diff --git a/c/enc/metablock.c b/c/enc/metablock.c
+index b3e6c38..5aa4d4f 100644
+--- a/c/enc/metablock.c
++++ b/c/enc/metablock.c
+@@ -196,7 +196,7 @@ void BrotliBuildMetaBlock(MemoryManager* m,
+     literal_context_multiplier = 1 << BROTLI_LITERAL_CONTEXT_BITS;
+     literal_context_modes =
+         BROTLI_ALLOC(m, ContextType, mb->literal_split.num_types);
+-    if (BROTLI_IS_OOM(m)) return;
++    if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(literal_context_modes)) return;
+     for (i = 0; i < mb->literal_split.num_types; ++i) {
+       literal_context_modes[i] = literal_context_mode;
+     }
+@@ -206,21 +206,21 @@ void BrotliBuildMetaBlock(MemoryManager* m,
+       mb->literal_split.num_types * literal_context_multiplier;
+   literal_histograms =
+       BROTLI_ALLOC(m, HistogramLiteral, literal_histograms_size);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(literal_histograms)) return;
+   ClearHistogramsLiteral(literal_histograms, literal_histograms_size);
+ 
+   distance_histograms_size =
+       mb->distance_split.num_types << BROTLI_DISTANCE_CONTEXT_BITS;
+   distance_histograms =
+       BROTLI_ALLOC(m, HistogramDistance, distance_histograms_size);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(distance_histograms)) return;
+   ClearHistogramsDistance(distance_histograms, distance_histograms_size);
+ 
+   BROTLI_DCHECK(mb->command_histograms == 0);
+   mb->command_histograms_size = mb->command_split.num_types;
+   mb->command_histograms =
+       BROTLI_ALLOC(m, HistogramCommand, mb->command_histograms_size);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(mb->command_histograms)) return;
+   ClearHistogramsCommand(mb->command_histograms, mb->command_histograms_size);
+ 
+   BrotliBuildHistogramsWithContext(cmds, num_commands,
+@@ -234,13 +234,13 @@ void BrotliBuildMetaBlock(MemoryManager* m,
+       mb->literal_split.num_types << BROTLI_LITERAL_CONTEXT_BITS;
+   mb->literal_context_map =
+       BROTLI_ALLOC(m, uint32_t, mb->literal_context_map_size);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(mb->literal_context_map)) return;
+ 
+   BROTLI_DCHECK(mb->literal_histograms == 0);
+   mb->literal_histograms_size = mb->literal_context_map_size;
+   mb->literal_histograms =
+       BROTLI_ALLOC(m, HistogramLiteral, mb->literal_histograms_size);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(mb->literal_histograms)) return;
+ 
+   BrotliClusterHistogramsLiteral(m, literal_histograms, literal_histograms_size,
+       kMaxNumberOfHistograms, mb->literal_histograms,
+@@ -265,13 +265,13 @@ void BrotliBuildMetaBlock(MemoryManager* m,
+       mb->distance_split.num_types << BROTLI_DISTANCE_CONTEXT_BITS;
+   mb->distance_context_map =
+       BROTLI_ALLOC(m, uint32_t, mb->distance_context_map_size);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(mb->distance_context_map)) return;
+ 
+   BROTLI_DCHECK(mb->distance_histograms == 0);
+   mb->distance_histograms_size = mb->distance_context_map_size;
+   mb->distance_histograms =
+       BROTLI_ALLOC(m, HistogramDistance, mb->distance_histograms_size);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(mb->distance_histograms)) return;
+ 
+   BrotliClusterHistogramsDistance(m, distance_histograms,
+                                   mb->distance_context_map_size,
+@@ -369,7 +369,7 @@ static void InitContextBlockSplitter(
+   *histograms_size = max_num_types * num_contexts;
+   *histograms = BROTLI_ALLOC(m, HistogramLiteral, *histograms_size);
+   self->histograms_ = *histograms;
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(*histograms)) return;
+   /* Clear only current histogram. */
+   ClearHistogramsLiteral(&self->histograms_[0], num_contexts);
+   self->last_histogram_ix_[0] = self->last_histogram_ix_[1] = 0;
+@@ -419,7 +419,7 @@ static void ContextBlockSplitterFinishBlock(
+     double combined_entropy[2 * BROTLI_MAX_STATIC_CONTEXTS];
+     double diff[2] = { 0.0 };
+     size_t i;
+-    if (BROTLI_IS_OOM(m)) return;
++    if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(combined_histo)) return;
+     for (i = 0; i < num_contexts; ++i) {
+       size_t curr_histo_ix = self->curr_histogram_ix_ + i;
+       size_t j;
+@@ -523,7 +523,7 @@ static void MapStaticContexts(MemoryManager* m,
+       mb->literal_split.num_types << BROTLI_LITERAL_CONTEXT_BITS;
+   mb->literal_context_map =
+       BROTLI_ALLOC(m, uint32_t, mb->literal_context_map_size);
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(mb->literal_context_map)) return;
+ 
+   for (i = 0; i < mb->literal_split.num_types; ++i) {
+     uint32_t offset = (uint32_t)(i * num_contexts);
+diff --git a/c/enc/metablock_inc.h b/c/enc/metablock_inc.h
+index dcc9d3c..ed507ef 100644
+--- a/c/enc/metablock_inc.h
++++ b/c/enc/metablock_inc.h
+@@ -71,7 +71,7 @@ static void FN(InitBlockSplitter)(
+   *histograms_size = max_num_types;
+   *histograms = BROTLI_ALLOC(m, HistogramType, *histograms_size);
+   self->histograms_ = *histograms;
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(*histograms)) return;
+   /* Clear only current histogram. */
+   FN(HistogramClear)(&self->histograms_[0]);
+   self->last_histogram_ix_[0] = self->last_histogram_ix_[1] = 0;
+diff --git a/c/enc/ringbuffer.h b/c/enc/ringbuffer.h
+index 2fbac07..8dce148 100644
+--- a/c/enc/ringbuffer.h
++++ b/c/enc/ringbuffer.h
+@@ -75,7 +75,7 @@ static BROTLI_INLINE void RingBufferInitBuffer(
+   uint8_t* new_data = BROTLI_ALLOC(
+       m, uint8_t, 2 + buflen + kSlackForEightByteHashingEverywhere);
+   size_t i;
+-  if (BROTLI_IS_OOM(m)) return;
++  if (BROTLI_IS_OOM(m) || BROTLI_IS_NULL(new_data)) return;
+   if (rb->data_) {
+     memcpy(new_data, rb->data_,
+         2 + rb->cur_size_ + kSlackForEightByteHashingEverywhere);
+diff --git a/java/org/brotli/dec/BUILD b/java/org/brotli/dec/BUILD
+index e6d3a4d..13ec43a 100644
+--- a/java/org/brotli/dec/BUILD
++++ b/java/org/brotli/dec/BUILD
+@@ -11,7 +11,7 @@ java_library(
+         ["*.java"],
+         exclude = ["*Test*.java"],
+     ),
+-    proguard_specs = ["proguard.cfg"],
++    proguard_specs = ["proguard.pgcfg"],
+ )
+ 
+ java_library(
+diff --git a/java/org/brotli/dec/proguard.cfg b/java/org/brotli/dec/proguard.pgcfg
+similarity index 100%
+rename from java/org/brotli/dec/proguard.cfg
+rename to java/org/brotli/dec/proguard.pgcfg
+diff --git a/js/decode.js b/js/decode.js
+old mode 100755
+new mode 100644
+-- 
+2.19.1
+

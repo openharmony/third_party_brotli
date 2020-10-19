@@ -1,0 +1,76 @@
+From 4b5771bee7995d3d606221caa455c044d80434df Mon Sep 17 00:00:00 2001
+From: agrieve <agrieve@chromium.org>
+Date: Thu, 19 Dec 2019 18:15:58 -0500
+Subject: [PATCH] Add missing "const" to a couple of kConstants (#780)
+
+These showed up in a Chromium audit:
+https://bugs.chromium.org/p/chromium/issues/detail?id=747064#c8
+
+Although already effectively const, adding "const" causes the symbols to
+be moved into the read-only section of the binary.
+---
+ c/common/dictionary.c | 11 ++++++++++-
+ c/common/transform.c  |  2 +-
+ 2 files changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/c/common/dictionary.c b/c/common/dictionary.c
+index 64822a3..f9e3041 100644
+--- a/c/common/dictionary.c
++++ b/c/common/dictionary.c
+@@ -5,12 +5,13 @@
+ */
+ 
+ #include "./dictionary.h"
++#include "./platform.h"
+ 
+ #if defined(__cplusplus) || defined(c_plusplus)
+ extern "C" {
+ #endif
+ 
+-#ifndef BROTLI_EXTERNAL_DICTIONARY_DATA
++#if !defined(BROTLI_EXTERNAL_DICTIONARY_DATA)
+ static const uint8_t kBrotliDictionaryData[] =
+ {
+ 116,105,109,101,100,111,119,110,108,105,102,101,108,101,102,116,98,97,99,107,99,
+@@ -5862,7 +5863,11 @@ static const uint8_t kBrotliDictionaryData[] =
+ ;
+ #endif  /* !BROTLI_EXTERNAL_DICTIONARY_DATA */
+ 
++#if !defined(BROTLI_EXTERNAL_DICTIONARY_DATA)
++static const BrotliDictionary kBrotliDictionary = {
++#else
+ static BrotliDictionary kBrotliDictionary = {
++#endif
+   /* size_bits_by_length */
+   {
+     0, 0, 0, 0, 10, 10, 11, 11,
+@@ -5895,9 +5900,13 @@ const BrotliDictionary* BrotliGetDictionary() {
+ }
+ 
+ void BrotliSetDictionaryData(const uint8_t* data) {
++#if defined(BROTLI_EXTERNAL_DICTIONARY_DATA)
+   if (!!data && !kBrotliDictionary.data) {
+     kBrotliDictionary.data = data;
+   }
++#else
++  BROTLI_UNUSED(data);  // Appease -Werror=unused-parameter
++#endif
+ }
+ 
+ #if defined(__cplusplus) || defined(c_plusplus)
+diff --git a/c/common/transform.c b/c/common/transform.c
+index c44f671..f8fa433 100755
+--- a/c/common/transform.c
++++ b/c/common/transform.c
+@@ -160,7 +160,7 @@ static const uint8_t kTransformsData[] = {
+    0, BROTLI_TRANSFORM_UPPERCASE_FIRST, 34,
+ };
+ 
+-static BrotliTransforms kBrotliTransforms = {
++static const BrotliTransforms kBrotliTransforms = {
+   sizeof(kPrefixSuffix),
+   (const uint8_t*)kPrefixSuffix,
+   kPrefixSuffixMap,
+-- 
+2.6.1.windows.1
+

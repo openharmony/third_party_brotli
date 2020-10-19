@@ -1,6 +1,6 @@
 Name:           brotli
 Version:        1.0.7
-Release:        1
+Release:        3
 Summary:        Lossless compression algorithm
 
 License:        MIT
@@ -8,6 +8,17 @@ URL:            https://github.com/google/brotli
 Source0:        https://github.com/google/brotli/archive/v%{version}.tar.gz
 
 BuildRequires:  python2-devel python3-devel gcc-c++ gcc cmake
+
+Patch6000: Verbose-CLI-start-pulling-Shared-Brotli.patch
+Patch6001: Ensure-decompression-consumes-all-input.patch
+Patch6002: fix-MSVC-configuration-and-c++-compilation-fails.patch
+Patch6003: fix-executable-mode-of-decode-js.patch
+Patch6004: Fix-include-for-EMCC-build.patch
+Patch6005: Add-an-option-to-avoid-building-shared-libraries.patch
+Patch6006: Disable-PIC-in-EMCC-mode.patch
+Patch6007: Add-missing-const-to-a-couple-of-kConstants.patch
+Patch6008: Move-TZCNT-and-BSR-intrinsics-and-add-MSVC-versions.patch
+Patch6009: CVE-2020-8927.patch
 
 %description
 Brotli is a generic-purpose lossless compression algorithm that compresses
@@ -42,7 +53,7 @@ This package installs the development files
 %package_help
 
 %prep
-%autosetup -n %{name}-%{version}
+%autosetup -n %{name}-%{version} -p1
 
 %{__chmod} 644 c/enc/*.[ch]
 %{__chmod} 644 c/include/brotli/*.h
@@ -103,6 +114,27 @@ popd
 %{_mandir}/man3/*
 
 %changelog
+* Mon Oct 19 2020 wangjie<wangjie294@huawei.com> -1.0.7-3
+- Type:CVE
+- CVE:CVE-2020-8927
+- SUG:NA
+- DESC:fix CVE-2020-8927
+
+* Mon Oct 19 2020 wangjie<wangjie294@huawei.com> -1.0.7-2
+- Type:bugfix
+- ID:NA
+- SUG:NA
+- DESC:Synchronize patches from community
+       Verbose-CLI-start-pulling-Shared-Brotli.patch
+       Ensure-decompression-consumes-all-input.patch
+       fix-MSVC-configuration-and-c++-compilation-fails.patch
+       fix-executable-mode-of-decode-js.patch
+       Fix-include-for-EMCC-build.patch
+       Add-an-option-to-avoid-building-shared-libraries.patch
+       Disable-PIC-in-EMCC-mode.patch
+       Add-missing-const-to-a-couple-of-kConstants.patch
+       Move-TZCNT-and-BSR-intrinsics-and-add-MSVC-versions.patch
+
 * Thu Apr 16 2020 chengquan<chengquan3@huawei.com> -1.0.7-1
 - Type:enhancement
 - ID:NA
