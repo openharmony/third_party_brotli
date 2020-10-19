@@ -1,0 +1,107 @@
+From 924b2b2b9dc54005edbcd85a1b872330948cdd9e Mon Sep 17 00:00:00 2001
+From: Clinton Ingram <clinton.ingram@outlook.com>
+Date: Thu, 19 Mar 2020 03:57:56 -0700
+Subject: [PATCH] Move TZCNT and BSR intrinsics to platform.h, add MSVC
+ versions (#636)
+
+---
+ c/common/platform.h       | 34 ++++++++++++++++++++++++++++++++++
+ c/enc/fast_log.h          |  6 ++----
+ c/enc/find_match_length.h |  5 ++---
+ 3 files changed, 38 insertions(+), 7 deletions(-)
+
+diff --git a/c/common/platform.h b/c/common/platform.h
+index 2633e04..ca79359 100755
+--- a/c/common/platform.h
++++ b/c/common/platform.h
+@@ -41,6 +41,10 @@
+ #define BROTLI_X_BIG_ENDIAN BIG_ENDIAN
+ #endif
+ 
++#if BROTLI_MSVC_VERSION_CHECK(12, 0, 0)
++#include <intrin.h>
++#endif
++
+ #if defined(BROTLI_ENABLE_LOG) || defined(BROTLI_DEBUG)
+ #include <assert.h>
+ #include <stdio.h>
+@@ -522,6 +526,36 @@ BROTLI_MIN_MAX(size_t) BROTLI_MIN_MAX(uint32_t) BROTLI_MIN_MAX(uint8_t)
+   (A)[(J)] = __brotli_swap_tmp;   \
+ }
+ 
++#if BROTLI_64_BITS
++#if BROTLI_GNUC_HAS_BUILTIN(__builtin_ctzll, 3, 4, 0) || \
++    BROTLI_INTEL_VERSION_CHECK(16, 0, 0)
++#define BROTLI_TZCNT64 __builtin_ctzll
++#elif BROTLI_MSVC_VERSION_CHECK(12, 0, 0)
++#if defined(BROTLI_TARGET_X64)
++#define BROTLI_TZCNT64 _tzcnt_u64
++#else /* BROTLI_TARGET_X64 */
++static BROTLI_INLINE uint32_t BrotliBsf64Msvc(uint64_t x) {
++  uint32_t lsb;
++  _BitScanForward64(&lsb, x);
++  return lsb;
++}
++#define BROTLI_TZCNT64 BrotliBsf64Msvc
++#endif /* BROTLI_TARGET_X64 */
++#endif /* __builtin_ctzll */
++#endif /* BROTLI_64_BITS */
++
++#if BROTLI_GNUC_HAS_BUILTIN(__builtin_clz, 3, 4, 0) || \
++    BROTLI_INTEL_VERSION_CHECK(16, 0, 0)
++#define BROTLI_BSR32(x) (31u ^ (uint32_t)__builtin_clz(x))
++#elif BROTLI_MSVC_VERSION_CHECK(12, 0, 0)
++static BROTLI_INLINE uint32_t BrotliBsr32Msvc(uint32_t x) {
++  uint32_t msb;
++  _BitScanReverse(&msb, x);
++  return msb;
++}
++#define BROTLI_BSR32 BrotliBsr32Msvc
++#endif /* __builtin_clz */
++
+ /* Default brotli_alloc_func */
+ static void* BrotliDefaultAllocFunc(void* opaque, size_t size) {
+   BROTLI_UNUSED(opaque);
+diff --git a/c/enc/fast_log.h b/c/enc/fast_log.h
+index b1268e0..eca58e8 100644
+--- a/c/enc/fast_log.h
++++ b/c/enc/fast_log.h
+@@ -19,10 +19,8 @@ extern "C" {
+ #endif
+ 
+ static BROTLI_INLINE uint32_t Log2FloorNonZero(size_t n) {
+-  /* TODO: generalize and move to platform.h */
+-#if BROTLI_GNUC_HAS_BUILTIN(__builtin_clz, 3, 4, 0) || \
+-    BROTLI_INTEL_VERSION_CHECK(16, 0, 0)
+-  return 31u ^ (uint32_t)__builtin_clz((uint32_t)n);
++#if defined(BROTLI_BSR32)
++  return BROTLI_BSR32((uint32_t)n);
+ #else
+   uint32_t result = 0;
+   while (n >>= 1) result++;
+diff --git a/c/enc/find_match_length.h b/c/enc/find_match_length.h
+index bc428cf..f8853a7 100644
+--- a/c/enc/find_match_length.h
++++ b/c/enc/find_match_length.h
+@@ -17,8 +17,7 @@ extern "C" {
+ #endif
+ 
+ /* Separate implementation for little-endian 64-bit targets, for speed. */
+-#if defined(__GNUC__) && defined(_LP64) && defined(BROTLI_LITTLE_ENDIAN)
+-
++#if defined(BROTLI_TZCNT64) && BROTLI_64_BITS && BROTLI_LITTLE_ENDIAN
+ static BROTLI_INLINE size_t FindMatchLengthWithLimit(const uint8_t* s1,
+                                                      const uint8_t* s2,
+                                                      size_t limit) {
+@@ -32,7 +31,7 @@ static BROTLI_INLINE size_t FindMatchLengthWithLimit(const uint8_t* s1,
+     } else {
+       uint64_t x = BROTLI_UNALIGNED_LOAD64LE(s2) ^
+           BROTLI_UNALIGNED_LOAD64LE(s1 + matched);
+-      size_t matching_bits = (size_t)__builtin_ctzll(x);
++      size_t matching_bits = (size_t)BROTLI_TZCNT64(x);
+       matched += matching_bits >> 3;
+       return matched;
+     }
+-- 
+2.6.1.windows.1
+
