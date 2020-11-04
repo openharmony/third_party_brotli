@@ -1,13 +1,13 @@
 Name:           brotli
 Version:        1.0.7
-Release:        3
+Release:        4
 Summary:        Lossless compression algorithm
 
 License:        MIT
 URL:            https://github.com/google/brotli
 Source0:        https://github.com/google/brotli/archive/v%{version}.tar.gz
 
-BuildRequires:  python2-devel python3-devel gcc-c++ gcc cmake
+BuildRequires:  python3-devel gcc-c++ gcc cmake
 
 Patch6000: Verbose-CLI-start-pulling-Shared-Brotli.patch
 Patch6001: Ensure-decompression-consumes-all-input.patch
@@ -26,14 +26,6 @@ data using a combination of a modern variant of the LZ77 algorithm, Huffman
 coding and 2nd order context modeling, with a compression ratio comparable
 to the best currently available general-purpose compression methods.
 It is similar in speed with deflate but offers more dense compression.
-
-%package     -n python2-%{name}
-Summary:        Lossless compression algorithm (python 2)
-Requires:       python2
-%{?python_provide:%python_provide python2-%{name}}
-
-%description -n python2-%{name}
-This package installs a Python 2 module.
 
 %package     -n python3-%{name}
 Requires:       python3
@@ -67,7 +59,6 @@ pushd build
 %make_build
 popd
 
-%py2_build
 %py3_build
 
 %install
@@ -76,7 +67,6 @@ pushd build
 %__rm "%{buildroot}%{_libdir}/"*.a
 popd
 
-%py2_install
 %py3_install
 %{__install} -dm755 "%{buildroot}%{_mandir}/man3"
 
@@ -97,10 +87,6 @@ popd
 %{_bindir}/brotli
 %{_libdir}/*.so.*
 
-%files -n python2-%{name}
-%license LICENSE
-%{python2_sitearch}/*
-
 %files -n python3-%{name}
 %license LICENSE
 %{python3_sitearch}/*
@@ -114,6 +100,12 @@ popd
 %{_mandir}/man3/*
 
 %changelog
+* Wed Nov 4 2020 wangjie<wangjie294@huawei.com> -1.0.7-4
+- Type:NA
+- ID:NA
+- SUG:NA
+- DESC:remove python2
+
 * Mon Oct 19 2020 wangjie<wangjie294@huawei.com> -1.0.7-3
 - Type:CVE
 - CVE:CVE-2020-8927
