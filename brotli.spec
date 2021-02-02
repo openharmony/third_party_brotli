@@ -1,6 +1,6 @@
 Name:           brotli
-Version:        1.0.7
-Release:        4
+Version:        1.0.9
+Release:        1
 Summary:        Lossless compression algorithm
 
 License:        MIT
@@ -9,16 +9,6 @@ Source0:        https://github.com/google/brotli/archive/v%{version}.tar.gz
 
 BuildRequires:  python3-devel gcc-c++ gcc cmake
 
-Patch6000: Verbose-CLI-start-pulling-Shared-Brotli.patch
-Patch6001: Ensure-decompression-consumes-all-input.patch
-Patch6002: fix-MSVC-configuration-and-c++-compilation-fails.patch
-Patch6003: fix-executable-mode-of-decode-js.patch
-Patch6004: Fix-include-for-EMCC-build.patch
-Patch6005: Add-an-option-to-avoid-building-shared-libraries.patch
-Patch6006: Disable-PIC-in-EMCC-mode.patch
-Patch6007: Add-missing-const-to-a-couple-of-kConstants.patch
-Patch6008: Move-TZCNT-and-BSR-intrinsics-and-add-MSVC-versions.patch
-Patch6009: CVE-2020-8927.patch
 
 %description
 Brotli is a generic-purpose lossless compression algorithm that compresses
@@ -100,6 +90,9 @@ popd
 %{_mandir}/man3/*
 
 %changelog
+* Tue Feb 2 2021 liudabo <liudabo1@huawei.com> - 1.0.9-1
+- upgrade version to 1.0.9
+
 * Wed Nov 4 2020 wangjie<wangjie294@huawei.com> -1.0.7-4
 - Type:NA
 - ID:NA
