@@ -1,11 +1,13 @@
 Name:           brotli
 Version:        1.0.9
-Release:        1
+Release:        2
 Summary:        Lossless compression algorithm
 
 License:        MIT
 URL:            https://github.com/google/brotli
 Source0:        https://github.com/google/brotli/archive/v%{version}.tar.gz
+
+Patch6000:      backport-Revert-Add-runtime-linker-path-to-pkg-config-files.patch
 
 BuildRequires:  python3-devel gcc-c++ gcc cmake
 
@@ -90,6 +92,9 @@ popd
 %{_mandir}/man3/*
 
 %changelog
+* Fri Feb 05 2021 shixuantong <shixuantong@huawei.com> - 1.0.9-2
+- Revert "Add runtime linker path to pkg-config files (#740)" 
+
 * Tue Feb 2 2021 liudabo <liudabo1@huawei.com> - 1.0.9-1
 - upgrade version to 1.0.9
 
