@@ -1,6 +1,6 @@
 Name:           brotli
 Version:        1.0.9
-Release:        2
+Release:        3
 Summary:        Lossless compression algorithm
 
 License:        MIT
@@ -92,6 +92,9 @@ popd
 %{_mandir}/man3/*
 
 %changelog
+* Tue Oct 25 2022 yanglongkang <yanglongkang@h-partners.com> - 1.0.9-3
+- rebuild for next release
+
 * Fri Feb 05 2021 shixuantong <shixuantong@huawei.com> - 1.0.9-2
 - Revert "Add runtime linker path to pkg-config files (#740)" 
 
