@@ -94,23 +94,6 @@ ohos_shared_library("brotli_shared") {
   part_name = "brotli"
 }
 
-ohos_static_library("brotli_static") {
-  deps = [ ":installOpenEulerBrotli" ]
-  if (current_os == "ios") {
-    ldflags = [
-      "-Wl",
-      "-install_name",
-      "@rpath/libbrotli_shared.framework/libbrotli_shared",
-    ]
-  }
-  public_configs = [ ":brotli_config" ]
-  sources = []
-  foreach(src, brotli_source) {
-    sources += [ "$code_dir/" + src ]
-  }
-  subsystem_name = "thirdparty"
-  part_name = "brotli"
-}
 group("brotli_target") {
   deps = [ "//third_party/brotli:brotli_shared" ]
 }
