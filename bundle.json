@@ -34,9 +34,6 @@
                         "header_files":[],
                         "header_base":"//third_party/brotli/c/include/brotli"
                     }
-                },
-                {
-                    "name":"//third_party/brotli:brotli_static"
                 }
             ],
             "test": []
