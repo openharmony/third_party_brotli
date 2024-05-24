@@ -90,6 +90,7 @@ ohos_shared_library("brotli_shared") {
     "updater",
     "system",
   ]
+  innerapi_tags = [ "chipsetsdk_indirect" ]
   subsystem_name = "thirdparty"
   part_name = "brotli"
 }
