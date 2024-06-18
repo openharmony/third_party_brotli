@@ -42,7 +42,6 @@ brotli_source = [
   "c/enc/utf8_util.c",
   "c/enc/dictionary_hash.c",
   "c/enc/histogram.c",
-  "c/tools/brotli.c",
 ]
 code_dir = root_build_dir + "/third_party/brotli" + "/brotli-1.0.9"
 src_path = "//third_party/brotli"
