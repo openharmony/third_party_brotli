@@ -2,7 +2,7 @@
     {
     "Name": "brotli",
     "License": "MIT License",
-    "License File": "COPYRIGHT",
+    "License File": "LICENSE",
     "Version Number": "1.0.9",
     "Owner": "hanjing5@huawei.com",
     "Upstream URL": "http://gitee.com/src-openeuler/brotli",
