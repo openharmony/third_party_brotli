@@ -72,6 +72,7 @@ Note:If the text contains special characters, please escape them according to th
             </filefilter>
             <filefilter name="binaryFileTypePolicyFilter">
                 <filteritem type="filename" name="v1.0.9.tar.gz" desc="Resource binary." />
+                <filteritem type="filename" name="v1.0.9.tar.gz" desc="Resource binary." />
             </filefilter>
         </filefilterlist>
     </oatconfig>
