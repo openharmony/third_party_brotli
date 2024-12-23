@@ -69,7 +69,7 @@ Note:If the text contains special characters, please escape them according to th
                 <filteritem type="filename" name="README*" desc="README file" />
                 <filteritem  type="filename" name="brotli.spec" desc="no license header natively"/>
                 <filteritem  type="filename" name="brotli.yaml" desc="no license header natively"/>
-                <filteritem type="filename" name="brotli-1.0.9/BUILD" desc="no license header natively"/>
+                <filteritem type="filepath" name="brotli-1.0.9/BUILD" desc="no license header natively"/>
             </filefilter>
             <filefilter name="binaryFileTypePolicyFilter">
                 <filteritem type="filename" name="v1.0.9.tar.gz" desc="Resource binary." />
