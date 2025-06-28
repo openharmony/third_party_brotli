@@ -6,7 +6,7 @@ OpenHarmony引入该算法用于增强http的基础能力，使之可以处理�
 
 源代码最新参考资料可以访问：[brotli](https://github.com/google/brotli)
 
-引入版本[openEuler-brotli-1.0.9](https://gitee.com/src-openeuler/brotli)
+引入版本1.1.0
 
 ## 引入背景描述
 当前HTTP模块不支持该算法，无法满足社区需求。
@@ -18,16 +18,6 @@ OpenHarmony引入该算法用于增强http的基础能力，使之可以处理�
 在发送http请求时header信息带上"Accept-Encoding:br"，则服务端会以brotli压缩的方式响应请求。
 
 brotli算法适用于静态网页数据、压缩阶段不敏感型、解压缩阶段敏感型等场景下的数据处理。
-
-## 软件架构
-```
-LICENSE           #版权声明
-v.1.0.9.tar.gz    #源码压缩包
-install.sh        #解压缩以及打补丁脚本
-patch             #补丁
-BUILD.gn          #编译程序
-```
-
 
 ## 安装教程
 

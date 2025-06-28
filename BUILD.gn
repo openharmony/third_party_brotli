@@ -17,6 +17,7 @@ brotli_source = [
   "c/common/context.c",
   "c/common/dictionary.c",
   "c/common/platform.c",
+  "c/common/shared_dictionary.c",
   "c/common/transform.c",
   "c/dec/bit_reader.c",
   "c/dec/decode.c",
@@ -29,39 +30,24 @@ brotli_source = [
   "c/enc/brotli_bit_stream.c",
   "c/enc/cluster.c",
   "c/enc/command.c",
+  "c/enc/compound_dictionary.c",
   "c/enc/compress_fragment.c",
   "c/enc/compress_fragment_two_pass.c",
+  "c/enc/dictionary_hash.c",
   "c/enc/encode.c",
   "c/enc/encoder_dict.c",
   "c/enc/entropy_encode.c",
-  "c/enc/literal_cost.c",
   "c/enc/fast_log.c",
+  "c/enc/histogram.c",
+  "c/enc/literal_cost.c",
   "c/enc/memory.c",
   "c/enc/metablock.c",
   "c/enc/static_dict.c",
   "c/enc/utf8_util.c",
-  "c/enc/dictionary_hash.c",
-  "c/enc/histogram.c",
 ]
-code_dir = root_build_dir + "/third_party/brotli" + "/brotli-1.0.9"
-src_path = "//third_party/brotli"
-brotli_path = root_build_dir + "/third_party/brotli"
-action("installOpenEulerBrotli") {
-  print("brotli install")
-  script = "install.sh"
 
-  args = [
-    rebase_path(src_path, root_build_dir),
-    rebase_path(brotli_path, root_build_dir),
-  ]
-  inputs = [ src_path ]
-  outputs = []
-  foreach(src, brotli_source) {
-    outputs += [ "$code_dir/" + src ]
-  }
-}
 config("brotli_config") {
-  include_dirs = [ "$code_dir" + "/c/include" ]
+  include_dirs = [ "c/include" ]
   cflags = [
     "-Wno-deprecated-declarations",
     "-D_GNU_SOURCE",
@@ -73,7 +59,6 @@ config("brotli_config") {
 
 ohos_shared_library("brotli_shared") {
   branch_protector_ret = "pac_ret"
-  deps = [ ":installOpenEulerBrotli" ]
   if (current_os == "ios") {
     ldflags = [
       "-Wl",
@@ -82,10 +67,7 @@ ohos_shared_library("brotli_shared") {
     ]
   }
   public_configs = [ ":brotli_config" ]
-  sources = []
-  foreach(src, brotli_source) {
-    sources += [ "$code_dir/" + src ]
-  }
+  sources = brotli_source
   install_images = [
     "updater",
     "system",
