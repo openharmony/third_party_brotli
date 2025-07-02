@@ -15,8 +15,6 @@
 
 SRC_DIR="$1"
 CODE_DIR="$2"
-OPEN_EULER_BROTLI_SOURCE_PATH="brotli-1.0.9"
-OPEN_EULER_BROTLI_TAR="v1.0.9.tar.gz"
 
 set -e
 echo "brotli test : $SRC_DIR" > brotlitest.txt
@@ -30,16 +28,6 @@ if [ -d "$CODE_DIR" ]; then
     rm -rf "$CODE_DIR"
 fi
 
-mkdir -p $CODE_DIR
-
-tar zxvf $SRC_DIR/$OPEN_EULER_BROTLI_TAR -C $CODE_DIR
-echo "brotli test :unzip brotli" > brotlitest.txt
-
-_all_patchs=(
-    "backport-Revert-Add-runtime-linker-path-to-pkg-config-files.patch"
-)
-for file in "${_all_patchs[@]}"
-    do 
-        patch -d $CODE_DIR/$OPEN_EULER_BROTLI_SOURCE_PATH -p1 < $SRC_DIR/$file --fuzz=0 --no-backup-if-mismatch
-    done
-exit 0
+mkdir -p $CODE_DIR/brotli-1.1.0
+cp -r $SRC_DIR/* $CODE_DIR/brotli-1.1.0
+echo "brotli test :copy brotli" > brotlitest.txt
