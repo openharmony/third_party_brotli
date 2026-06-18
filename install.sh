@@ -28,6 +28,6 @@ if [ -d "$CODE_DIR" ]; then
     rm -rf "$CODE_DIR"
 fi
 
-mkdir -p $CODE_DIR/brotli-1.1.0
-cp -r $SRC_DIR/* $CODE_DIR/brotli-1.1.0
+mkdir -p $CODE_DIR/brotli-1.2.0
+cp -r $SRC_DIR/* $CODE_DIR/brotli-1.2.0
 echo "brotli test :copy brotli" > brotlitest.txt
