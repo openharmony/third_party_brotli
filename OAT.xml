@@ -72,6 +72,7 @@ Note:If the text contains special characters, please escape them according to th
             <filefilter name="binaryFileTypePolicyFilter">
                 <filteritem type="filepath" name="tests/testdata/empty.compressed*" desc="Native third-party code"/>
                 <filteritem type="filepath" name="tests/testdata/ukkonooa.compressed*" desc="Native third-party code"/>
+                <filteritem type="filepath" name="tests/testdata/zerosukkanooa.compressed*" desc="Native third-party code"/>
             </filefilter>
         </filefilterlist>
     </oatconfig>
